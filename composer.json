@@ -1,0 +1,21 @@
+{
+    "name": "yinkar/hepsiburada-wrapper",
+    "type": "library",
+    "description": "",
+    "authors": [
+        {
+            "name": "Huseyin Karabas",
+            "email": "huseyinkarabas@platinmarket.com"
+        }
+    ],
+    "require": {
+        "guzzlehttp/guzzle": "^7.0",
+        "ext-json": "*",
+        "ext-simplexml": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "Trendyol\\": "src/"
+        }
+    }
+}
