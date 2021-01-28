@@ -17,5 +17,10 @@
         "psr-4": {
             "Trendyol\\": "src/"
         }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Trendyol\\": "src/"
+        }
     }
 }
