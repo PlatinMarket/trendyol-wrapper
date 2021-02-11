@@ -25,7 +25,7 @@ class TrendyolRestClient extends Client
             return parent::request($method, $uri, $options);
         }
         catch (GuzzleException $e) {
-            throw new TrendyolException();
+            throw new TrendyolException($e);
         }
     }
 }

@@ -35,14 +35,27 @@ class Trendyol
     protected $_client;
 
     /**
+     * @var bool Use staging server
+     */
+    protected $_staging = false;
+
+    /**
      * @var array Auth data to use listing methods by HTTP basic authentication
      */
     protected $_basicAuthInfo;
 
     /**
+     * @var string Api call user agent
+     */
+    protected $_userAgent;
+
+    /**
      * @var string Endpoint location to use methods
      */
-    private $_webServicesUri = 'https://api.trendyol.com/sapigw';
+    private $_webServicesUri = [
+        'staging' => 'https://stageapi.trendyol.com/stagesapigw',
+        'production' => 'https://api.trendyol.com/sapigw'
+    ];
 
     /**
      * The Trendyol integration API key, API secret and supplier Id
@@ -56,11 +69,13 @@ class Trendyol
      * @param string $apiSecret
      * @param string $supplierId
      */
-    public function __construct($apiKey, $apiSecret, $supplierId)
+    public function __construct($apiKey, $apiSecret, $supplierId, $integration, $staging = false)
     {
+        $this->setStaging($staging);
         $this->setApiKey($apiKey);
         $this->setApiSecret($apiSecret);
         $this->setSupplierId($supplierId);
+        $this->setUserAgent(\sprintf('%s - %s', $supplierId, $integration));
 
         $this->_client = new TrendyolRestClient();
 
@@ -68,6 +83,38 @@ class Trendyol
             $this->_apiKey,
             $this->_apiSecret
         ];
+    }
+
+    /**
+     * @return bool
+     */
+    public function isStaging()
+    {
+        return $this->_staging;
+    }
+
+    /**
+     * @param bool $staging
+     */
+    public function setStaging(bool $staging)
+    {
+        $this->_staging = $staging;
+    }
+
+    /**
+     * @return string
+     */
+    public function getUserAgent()
+    {
+        return $this->_userAgent;
+    }
+
+    /**
+     * @param string $userAgent
+     */
+    public function setUserAgent(string $userAgent)
+    {
+        $this->_userAgent = $userAgent;
     }
 
     /**
@@ -135,14 +182,27 @@ class Trendyol
     }
 
     /**
+     * @return string
+     */
+    public function getWebServicesUri()
+    {
+        return $this->_webServicesUri[$this->isStaging() ? 'staging' : 'production'];
+    }
+
+
+    /**
      * @return array
      * @throws TrendyolException
      */
     public function fetchCategoryTree()
     {
-        $uri = \sprintf('%s/product-categories', $this->_webServicesUri);
+        $uri = \sprintf('%s/product-categories', $this->getWebServicesUri());
 
-        $response = $this->_client->request('GET', $uri);
+        $response = $this->_client->request('GET', $uri, [
+            'headers' => [
+                'User-Agent' => $this->getUserAgent()
+            ]
+        ]);
 
         return (array) \json_decode($response->getBody(), true);
     }
@@ -153,10 +213,13 @@ class Trendyol
      */
     public function fetchAddresses()
     {
-        $uri = \sprintf('%s/suppliers/%s/addresses', $this->_webServicesUri, $this->_supplierId);
+        $uri = \sprintf('%s/suppliers/%s/addresses', $this->getWebServicesUri(), $this->_supplierId);
 
         $response = $this->_client->request('GET', $uri, [
-            'auth' => $this->_basicAuthInfo
+            'auth' => $this->_basicAuthInfo,
+            'headers' => [
+                'User-Agent' => $this->getUserAgent()
+            ]
         ]);
 
         return (array) \json_decode($response->getBody(), true);
@@ -166,12 +229,19 @@ class Trendyol
      * @return array
      * @throws TrendyolException
      */
-    public function fetchBrands()
+    public function fetchBrands($page = null, $size = null)
     {
-        $uri = \sprintf('%s/brands', $this->_webServicesUri);
+        $query = [];
+        if ($page) $query += [ 'page' => $page ];
+        if ($size) $query += [ 'size' => $size ];
+
+        $uri = \sprintf('%s/brands%s', $this->getWebServicesUri(), (!empty($query) ? '?' . http_build_query($query) : ''));
 
         $response = $this->_client->request('GET', $uri, [
-            'auth' => $this->_basicAuthInfo
+            'auth' => $this->_basicAuthInfo,
+            'headers' => [
+                'User-Agent' => $this->getUserAgent()
+            ]
         ]);
 
         return (array) \json_decode($response->getBody(), true);
@@ -184,10 +254,13 @@ class Trendyol
      */
     public function fetchBrandByName($brandName)
     {
-        $uri = \sprintf('%s/brands/by-name?name=%s', $this->_webServicesUri, $brandName);
+        $uri = \sprintf('%s/brands/by-name?name=%s', $this->getWebServicesUri(), $brandName);
 
         $response = $this->_client->request('GET', $uri, [
-            'auth' => $this->_basicAuthInfo
+            'auth' => $this->_basicAuthInfo,
+            'headers' => [
+                'User-Agent' => $this->getUserAgent()
+            ]
         ]);
 
         return (array) \json_decode($response->getBody(), true);
@@ -200,9 +273,13 @@ class Trendyol
      */
     public function fetchCategoryAttributes($categoryId)
     {
-        $uri = \sprintf('%s/product-categories/%s/attributes', $this->_webServicesUri, $categoryId);
+        $uri = \sprintf('%s/product-categories/%s/attributes', $this->getWebServicesUri(), $categoryId);
 
-        $response = $this->_client->request('GET', $uri);
+        $response = $this->_client->request('GET', $uri, [
+            'headers' => [
+                'User-Agent' => $this->getUserAgent()
+            ]
+        ]);
 
         return (array) \json_decode($response->getBody(), true);
     }
@@ -262,11 +339,12 @@ class Trendyol
      */
     public function createProducts($productsJson)
     {
-        $uri = \sprintf('%s/suppliers/%s/v2/products', $this->_webServicesUri, $this->_supplierId);
+        $uri = \sprintf('%s/suppliers/%s/v2/products', $this->getWebServicesUri(), $this->_supplierId);
 
         $response = $this->_client->request('POST', $uri, [
             'headers' => [
-                'Content-Type' => 'application/json'
+                'Content-Type' => 'application/json',
+                'User-Agent' => $this->getUserAgent()
             ],
             'body' => $productsJson,
             'auth' => $this->_basicAuthInfo
@@ -342,10 +420,13 @@ class Trendyol
      */
     public function productCreatingStatus($trackingId)
     {
-        $uri = \sprintf('%s/suppliers/%s/products/batch-requests/%s', $this->_webServicesUri, $this->_supplierId, $trackingId);
+        $uri = \sprintf('%s/suppliers/%s/products/batch-requests/%s', $this->getWebServicesUri(), $this->_supplierId, $trackingId);
 
         $response = $this->_client->request('GET', $uri, [
-            'auth' => $this->_basicAuthInfo
+            'auth' => $this->_basicAuthInfo,
+            'headers' => [
+                'User-Agent' => $this->getUserAgent()
+            ]
         ]);
 
         return (array) \json_decode($response->getBody(), true);
@@ -373,11 +454,12 @@ class Trendyol
      */
     public function updatePriceAndInventory($dataJson)
     {
-        $uri = \sprintf('%s/suppliers/%s/products/price-and-inventory', $this->_webServicesUri, $this->_supplierId);
+        $uri = \sprintf('%s/suppliers/%s/products/price-and-inventory', $this->getWebServicesUri(), $this->_supplierId);
 
         $response = $this->_client->request('POST', $uri, [
             'headers' => [
-                'Content-Type' => 'application/json'
+                'Content-Type' => 'application/json',
+                'User-Agent' => $this->getUserAgent()
             ],
             'body' => $dataJson,
             'auth' => $this->_basicAuthInfo
